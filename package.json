@@ -1,0 +1,28 @@
+{
+  "name": "docusaurus-image-compressor",
+  "version": "1.0.0",
+  "description": "In-place image compressor for Docusaurus sites using Sharp. Optimized for screenshots (high quality, minimal blur).",
+  "type": "module",
+  "bin": {
+    "compress-images": "./compress-images.js"
+  },
+  "scripts": {
+    "compress": "node compress-images.js",
+    "compress:dry": "node compress-images.js --dry-run"
+  },
+  "keywords": [
+    "docusaurus",
+    "image",
+    "compression",
+    "sharp",
+    "screenshots",
+    "optimize"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "sharp": "^0.33.5"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
