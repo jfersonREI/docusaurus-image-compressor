@@ -44,7 +44,7 @@ Then copy `compress-images.js` into your project (e.g. into a `scripts/` folder)
 ### Dry run (recommended first)
 
 ```bash
-npm run compress:dry
+npm run compress:images:dry
 ```
 
 or
@@ -59,13 +59,13 @@ This shows what *would* be compressed and the estimated savings without modifyin
 
 ```bash
 # Dry run on one folder
-npm run compress:dry -- docs/screenshots
+npm run compress:images:dry -- docs/screenshots
 
 # Or
 node compress-images.js --dry-run docs/screenshots
 
 # Actually compress one folder
-npm run compress -- static/img
+npm run compress:images -- static/img
 
 # Or
 node compress-images.js static/img
@@ -82,7 +82,7 @@ If you don’t specify a folder, it falls back to the default list in the script
 ### Actual compression
 
 ```bash
-npm run compress
+npm run compress:images
 ```
 
 or
@@ -115,7 +115,7 @@ export default {
   maxWidth: 2560,
   skipSmallerThan: 15 * 1024,
   minSavingsPercent: 10,
-  concurrency: 8,
+  concurrency: null, // null = auto-detect based on CPU cores
 };
 ```
 
@@ -162,9 +162,9 @@ This was a dry run. Run without --dry-run to apply changes.
 ## Recommended workflow
 
 1. Commit your current images (or make a backup).
-2. Run `npm run compress:dry` and review the savings.
+2. Run `npm run compress:images:dry` and review the savings.
 3. Spot-check a few images at 100% zoom.
-4. Run `npm run compress` to apply the changes.
+4. Run `npm run compress:images` to apply the changes.
 5. Commit the optimized images.
 
 ## License
