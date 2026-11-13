@@ -78,7 +78,6 @@ async function compressImage(filePath) {
 
   const stats = await fs.stat(filePath);
   if (stats.size < SKIP_SMALLER_THAN) {
-    console.log(`⏭  Skipped (small): ${path.relative(process.cwd(), filePath)}`);
     skippedCount++;
     return;
   }
@@ -132,19 +131,20 @@ async function compressImage(filePath) {
       compressedCount++;
 
       if (DRY_RUN) {
-        console.log(`✓ ${relPath}  ${formatSize(stats.size)} → ${formatSize(newStats.size)}  (−${savings}%)`);
+        // Log notable results only
+        console.log(`\n✓ ${relPath}  ${formatSize(stats.size)} → ${formatSize(newStats.size)}  (−${savings}%)`);
         await fs.unlink(tmpPath);
       } else {
         await fs.unlink(filePath);
         await fs.rename(tmpPath, filePath);
-        console.log(`✓ ${relPath}  ${formatSize(stats.size)} → ${formatSize(newStats.size)}  (−${savings}%)`);
+        console.log(`\n✓ ${relPath}  ${formatSize(stats.size)} → ${formatSize(newStats.size)}  (−${savings}%)`);
       }
     } else {
       await fs.unlink(tmpPath);
       const reason = savingsPercent < MIN_SAVINGS_PERCENT && newStats.size < stats.size
         ? `below ${MIN_SAVINGS_PERCENT}% threshold`
         : 'no savings';
-      console.log(`⏭  Skipped (${reason}): ${relPath}`);
+      // Quiet skip for large runs — only log if we want verbose later
       skippedCount++;
     }
   } catch (err) {
@@ -168,14 +168,43 @@ async function collectFiles(dir, files = []) {
   return files;
 }
 
-// Simple concurrency pool
+// Simple concurrency pool with live progress + ETA
 async function processInParallel(items, concurrency, fn) {
-  const results = [];
+  const total = items.length;
+  let completed = 0;
   const executing = new Set();
+  const startTime = Date.now();
+
+  function formatDuration(ms) {
+    const seconds = Math.round(ms / 1000);
+    if (seconds < 60) return `${seconds}s`;
+    const minutes = Math.floor(seconds / 60);
+    const remSeconds = seconds % 60;
+    return remSeconds > 0 ? `${minutes}m ${remSeconds}s` : `${minutes}m`;
+  }
+
+  function updateProgress() {
+    const percent = Math.round((completed / total) * 100);
+    let etaText = '';
+
+    if (completed > 5 && completed < total) {
+      const elapsed = Date.now() - startTime;
+      const avgPerItem = elapsed / completed;
+      const remaining = (total - completed) * avgPerItem;
+      etaText = `  ETA: ${formatDuration(remaining)}`;
+    }
+
+    process.stdout.write(`\rProgress: ${completed}/${total} (${percent}%)${etaText}   `);
+  }
+
+  updateProgress();
 
   for (const item of items) {
-    const p = Promise.resolve().then(() => fn(item));
-    results.push(p);
+    const p = Promise.resolve().then(async () => {
+      await fn(item);
+      completed++;
+      updateProgress();
+    });
     executing.add(p);
     p.finally(() => executing.delete(p));
 
@@ -184,7 +213,8 @@ async function processInParallel(items, concurrency, fn) {
     }
   }
 
-  await Promise.all(results);
+  await Promise.all(executing);
+  process.stdout.write('\n\n');
 }
 
 function formatSize(bytes) {

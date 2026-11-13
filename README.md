@@ -21,6 +21,7 @@ Designed for documentation sites full of screenshots. It prioritizes sharpness o
 - Optional mild resize only for very large images (> 2560px)
 - Minimum savings threshold (default 10%) — skips files that barely shrink
 - Parallel processing (auto-detects CPU cores, or set manually)
+- Live progress indicator with ETA for large runs
 - Tracks failed files and shows them in the summary
 - Skips tiny files and folders like `node_modules`, `build`, `.git`
 
@@ -143,12 +144,11 @@ Settings: quality=92, min savings=10%, concurrency=8 (auto)
 
 Found 142 files to check...
 
+Progress: 71/142 (50%)  ETA: 12s
 ✓ docs/screenshots/login.png          1.42 MB → 612 KB  (−57.0%)
 ✓ static/img/dashboard.png            890 KB → 310 KB  (−65.2%)
-⏭  Skipped (below 10% threshold): docs/images/already-optimized.png
-⏭  docs/images/icon.png               Skipped (small)
-✗ Failed docs/bad-image.png: Input file is missing or of an unsupported image format
-✓ docs/screenshots/error.png          2.10 MB → 740 KB  (−64.8%)
+
+Progress: 142/142 (100%)
 
 Summary:
   Compressed: 3
