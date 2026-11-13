@@ -8,7 +8,10 @@ Designed for documentation sites full of screenshots. It prioritizes sharpness o
 - Recursive — scans all subfolders
 - Dry-run mode to preview savings before changing anything
 - High-quality settings tuned for screenshots
-- Only replaces a file when the compressed version is actually smaller
+- Only replaces a file when the compressed version is actually smaller **and** meets the minimum savings threshold
+- Parallel processing for faster runs on large image sets
+- Confirmation prompt before any real changes
+- Command-line folder targeting
 
 ## Features
 
@@ -16,6 +19,9 @@ Designed for documentation sites full of screenshots. It prioritizes sharpness o
 - PNG: lossless maximum compression
 - WebP: high quality
 - Optional mild resize only for very large images (> 2560px)
+- Minimum savings threshold (default 10%) — skips files that barely shrink
+- Parallel processing (auto-detects CPU cores, or set manually)
+- Tracks failed files and shows them in the summary
 - Skips tiny files and folders like `node_modules`, `build`, `.git`
 
 ## Installation
@@ -96,33 +102,58 @@ Type `yes` (or `y`) to proceed. Anything else aborts with no changes.
 
 ## Configuration
 
-Open `compress-images.js` and edit the constants at the top:
+You can customize settings by editing `compress.config.js` (recommended).  
+If the file is missing, the script falls back to the same defaults.
+
+**Example `compress.config.js`:**
 
 ```js
-const DIRECTORIES = [
-  'static',
-  'docs',
-  // add more folders
-];
-
-const QUALITY = 92;                 // 90–95 is ideal for screenshots
-const MAX_WIDTH = 2560;             // set to null to disable resizing
-const SKIP_SMALLER_THAN = 15 * 1024;
+export default {
+  directories: ['static', 'docs'],
+  quality: 92,
+  maxWidth: 2560,
+  skipSmallerThan: 15 * 1024,
+  minSavingsPercent: 10,
+  concurrency: 8,
+};
 ```
+
+### Config options
+
+| Option               | Type          | Default          | Description |
+|----------------------|---------------|------------------|-------------|
+| `directories`        | `string[]`    | `['static', 'docs']` | Folders scanned when you don’t pass a folder on the command line |
+| `quality`            | `number`      | `92`             | JPEG and WebP quality (0–100). 90–95 keeps screenshots sharp |
+| `maxWidth`           | `number` \| `null` | `2560`      | Resize images wider than this. Set to `null` to never resize |
+| `skipSmallerThan`    | `number`      | `15360` (15 KB)  | Skip files smaller than this (in bytes) |
+| `minSavingsPercent`  | `number`      | `10`             | Only replace a file if the compressed version is at least this % smaller |
+| `concurrency`        | `number` \| `null` | `null` (auto) | How many images to process in parallel. `null` = auto-detect based on CPU cores |
+
+
+**Notes**
+- PNG compression is always lossless (the `quality` setting does not apply to PNGs).
+- Command-line folders always override the `directories` list.
+- You can omit any option — missing ones fall back to the defaults above.
+
 
 ## Example output
 
 ```
-Dry run — no files will be modified
+Settings: quality=92, min savings=10%, concurrency=8 (auto)
+
+Found 142 files to check...
 
 ✓ docs/screenshots/login.png          1.42 MB → 612 KB  (−57.0%)
 ✓ static/img/dashboard.png            890 KB → 310 KB  (−65.2%)
+⏭  Skipped (below 10% threshold): docs/images/already-optimized.png
 ⏭  docs/images/icon.png               Skipped (small)
+✗ Failed docs/bad-image.png: Input file is missing or of an unsupported image format
 ✓ docs/screenshots/error.png          2.10 MB → 740 KB  (−64.8%)
 
 Summary:
   Compressed: 3
-  Skipped:    1
+  Skipped:    2
+  Failed:     1
   Savings:    2.75 MB (−62.1%)
 
 This was a dry run. Run without --dry-run to apply changes.
