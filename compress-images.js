@@ -2,6 +2,7 @@
 import fs from 'fs/promises';
 import path from 'path';
 import sharp from 'sharp';
+import readline from 'readline';
 
 // ─────────────────────────────────────────────────────────────
 // Configuration
@@ -17,12 +18,33 @@ const MAX_WIDTH = 2560;             // Only resize images wider than this (set t
 const SKIP_SMALLER_THAN = 15 * 1024; // Skip files already smaller than 15 KB
 
 // ─────────────────────────────────────────────────────────────
-const DRY_RUN = process.argv.includes('--dry-run');
+const args = process.argv.slice(2);
+const DRY_RUN = args.includes('--dry-run');
+
+// Any non-flag argument is treated as a target folder
+const targetFolders = args.filter(arg => !arg.startsWith('--'));
+
+// If no folder is specified, fall back to the default list
+const DIRECTORIES_TO_PROCESS = targetFolders.length > 0 ? targetFolders : DIRECTORIES;
+
 
 let totalOriginal = 0;
 let totalCompressed = 0;
 let compressedCount = 0;
 let skippedCount = 0;
+
+function askConfirmation(question) {
+  return new Promise((resolve) => {
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout,
+    });
+    rl.question(question, (answer) => {
+      rl.close();
+      resolve(answer.trim().toLowerCase());
+    });
+  });
+}
 
 async function compressImage(filePath) {
   const ext = path.extname(filePath).toLowerCase();
@@ -121,15 +143,30 @@ function formatSize(bytes) {
 }
 
 (async () => {
+  if (!DRY_RUN) {
+    console.log('⚠️  This will permanently replace image files that can be made smaller.\n');
+    const answer = await askConfirmation('Are you sure you want to continue? (yes/no): ');
+    if (answer !== 'yes' && answer !== 'y') {
+      console.log('Aborted. No files were changed.');
+      process.exit(0);
+    }
+    console.log('');
+  }
+
   console.log(DRY_RUN ? 'Dry run — no files will be modified\n' : 'Compressing images...\n');
 
-  for (const dir of DIRECTORIES) {
+  if (targetFolders.length > 0) {
+    console.log(`Target folder(s): ${targetFolders.join(', ')}\n`);
+  }
+
+  for (const dir of DIRECTORIES_TO_PROCESS) {
     try {
       await walk(dir);
     } catch (err) {
       console.warn(`Could not process "${dir}": ${err.message}`);
     }
   }
+
 
   const totalSavings = totalOriginal - totalCompressed;
   const percent = totalOriginal > 0

@@ -48,6 +48,30 @@ node compress-images.js --dry-run
 
 This shows what *would* be compressed and the estimated savings without modifying any files.
 
+### Compress a specific folder only
+
+```bash
+# Dry run on one folder
+npm run compress:dry -- docs/screenshots
+
+# Or
+node compress-images.js --dry-run docs/screenshots
+
+# Actually compress one folder
+npm run compress -- static/img
+
+# Or
+node compress-images.js static/img
+```
+
+You can pass multiple folders:
+
+```bash
+node compress-images.js docs/screenshots static/img --dry-run
+```
+
+If you don’t specify a folder, it falls back to the default list in the script (`static` and `docs`).
+
 ### Actual compression
 
 ```bash
@@ -59,6 +83,16 @@ or
 ```bash
 node compress-images.js
 ```
+
+You’ll be asked to confirm before any files are replaced:
+
+```
+⚠️  This will permanently replace image files that can be made smaller.
+
+Are you sure you want to continue? (yes/no):
+```
+
+Type `yes` (or `y`) to proceed. Anything else aborts with no changes.
 
 ## Configuration
 
