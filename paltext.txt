@@ -5,6 +5,30 @@ const ExcelJS = require("exceljs");
 const input = path.resolve(__dirname, "../../pa11y-ci-report/results.json");
 const output = path.resolve(__dirname, "../../pa11y-ci-report/issues.xlsx");
 
+function cleanUrl(fullUrl) {
+  try {
+    const url = new URL(fullUrl);
+    return url.pathname || fullUrl;
+  } catch {
+    return fullUrl;
+  }
+}
+
+function guessMarkdownPath(pathname) {
+  // Strip leading /help/ (or just /) and trailing slash
+  let p = pathname.replace(/^\/help\//, "").replace(/\/$/, "");
+  if (!p) return "";
+
+  // Common Docusaurus patterns
+  if (p.startsWith("docs/")) {
+    return `${p}.md`;
+  }
+  if (p.startsWith("blog/")) {
+    return `${p}.md`;
+  }
+  return `docs/${p}.md`;
+}
+
 async function main() {
   const data = JSON.parse(fs.readFileSync(input, "utf8"));
   const results = data.results || {};
@@ -14,15 +38,23 @@ async function main() {
   for (const [url, pageIssues] of Object.entries(results)) {
     if (!Array.isArray(pageIssues) || pageIssues.length === 0) continue;
 
+    const clean = cleanUrl(url);
+    const mdPath = guessMarkdownPath(clean);
+
     for (const issue of pageIssues) {
       issues.push({
-        url,
+        url: clean,
+        fullUrl: url,
         type: issue.type || "",
         code: issue.code || "",
         message: issue.message || "",
+        markdown: mdPath,
       });
     }
   }
+
+  // Sort by URL so issues for the same page are grouped
+  issues.sort((a, b) => a.url.localeCompare(b.url));
 
   // Summary: group by code
   const summaryMap = new Map();
@@ -53,32 +85,82 @@ async function main() {
     { header: "Type", key: "type", width: 12 },
     { header: "Code", key: "code", width: 50 },
     { header: "Message", key: "message", width: 80 },
-    { header: "Example URL", key: "exampleUrl", width: 70 },
+    { header: "Example Path", key: "exampleUrl", width: 60 },
   ];
   summarySheet.addRows(summary);
   summarySheet.getRow(1).font = { bold: true };
   summarySheet.autoFilter = "A1:E1";
   summarySheet.views = [{ state: "frozen", ySplit: 1 }];
+  summarySheet.getColumn("message").alignment = {
+    wrapText: true,
+    vertical: "top",
+  };
+
+  // Color summary by type
+  summarySheet.eachRow((row, rowNumber) => {
+    if (rowNumber === 1) return;
+    const type = row.getCell("type").value;
+    if (type === "error") {
+      row.getCell("type").fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: "FFFFC7CE" },
+      };
+    } else if (type === "warning") {
+      row.getCell("type").fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: "FFFFEB9C" },
+      };
+    }
+  });
 
   // Issues sheet
   const issuesSheet = workbook.addWorksheet("Issues");
   issuesSheet.columns = [
-    { header: "URL", key: "url", width: 70 },
+    { header: "Path", key: "url", width: 60 },
     { header: "Type", key: "type", width: 12 },
     { header: "Code", key: "code", width: 50 },
     { header: "Message", key: "message", width: 80 },
+    { header: "Likely Markdown File", key: "markdown", width: 50 },
   ];
-  issuesSheet.addRows(issues);
-  issuesSheet.getRow(1).font = { bold: true };
-  issuesSheet.autoFilter = "A1:D1";
-  issuesSheet.views = [{ state: "frozen", ySplit: 1 }];
 
-  // Enable text wrapping on the long columns
+  issues.forEach((issue) => {
+    const row = issuesSheet.addRow({
+      url: issue.url,
+      type: issue.type,
+      code: issue.code,
+      message: issue.message,
+      markdown: issue.markdown,
+    });
+
+    // Make the path a clickable hyperlink
+    row.getCell("url").value = {
+      text: issue.url,
+      hyperlink: issue.fullUrl,
+    };
+    row.getCell("url").font = { color: { argb: "FF0000FF" }, underline: true };
+
+    // Color by type
+    if (issue.type === "error") {
+      row.getCell("type").fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: "FFFFC7CE" },
+      };
+    } else if (issue.type === "warning") {
+      row.getCell("type").fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: "FFFFEB9C" },
+      };
+    }
+  });
+
+  issuesSheet.getRow(1).font = { bold: true };
+  issuesSheet.autoFilter = "A1:E1";
+  issuesSheet.views = [{ state: "frozen", ySplit: 1 }];
   issuesSheet.getColumn("message").alignment = {
-    wrapText: true,
-    vertical: "top",
-  };
-  summarySheet.getColumn("message").alignment = {
     wrapText: true,
     vertical: "top",
   };
