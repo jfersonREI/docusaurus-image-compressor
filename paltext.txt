@@ -14,21 +14,6 @@ function cleanUrl(fullUrl) {
   }
 }
 
-function guessMarkdownPath(pathname) {
-  // Strip leading /help/ (or just /) and trailing slash
-  let p = pathname.replace(/^\/help\//, "").replace(/\/$/, "");
-  if (!p) return "";
-
-  // Common Docusaurus patterns
-  if (p.startsWith("docs/")) {
-    return `${p}.md`;
-  }
-  if (p.startsWith("blog/")) {
-    return `${p}.md`;
-  }
-  return `docs/${p}.md`;
-}
-
 async function main() {
   const data = JSON.parse(fs.readFileSync(input, "utf8"));
   const results = data.results || {};
@@ -39,7 +24,6 @@ async function main() {
     if (!Array.isArray(pageIssues) || pageIssues.length === 0) continue;
 
     const clean = cleanUrl(url);
-    const mdPath = guessMarkdownPath(clean);
 
     for (const issue of pageIssues) {
       issues.push({
@@ -48,7 +32,6 @@ async function main() {
         type: issue.type || "",
         code: issue.code || "",
         message: issue.message || "",
-        markdown: mdPath,
       });
     }
   }
@@ -122,7 +105,6 @@ async function main() {
     { header: "Type", key: "type", width: 12 },
     { header: "Code", key: "code", width: 50 },
     { header: "Message", key: "message", width: 80 },
-    { header: "Likely Markdown File", key: "markdown", width: 50 },
   ];
 
   issues.forEach((issue) => {
@@ -131,7 +113,6 @@ async function main() {
       type: issue.type,
       code: issue.code,
       message: issue.message,
-      markdown: issue.markdown,
     });
 
     // Make the path a clickable hyperlink
@@ -158,7 +139,7 @@ async function main() {
   });
 
   issuesSheet.getRow(1).font = { bold: true };
-  issuesSheet.autoFilter = "A1:E1";
+  issuesSheet.autoFilter = "A1:D1";
   issuesSheet.views = [{ state: "frozen", ySplit: 1 }];
   issuesSheet.getColumn("message").alignment = {
     wrapText: true,
