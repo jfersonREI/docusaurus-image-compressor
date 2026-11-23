@@ -1,22 +1,152 @@
-import React from "react";
-import { render, screen, fireEvent } from "@testing-library/react";
-import HomepageSearch from "./index";
+import React, { useState, useRef, useEffect } from 'react';
+import { CircleCheck } from 'lucide-react';
+import styles from './FeedbackWidget.module.css';
 
-describe("HomepageSearch", () => {
-  it("renders and submits the search form", () => {
-    const { asFragment } = render(<HomepageSearch />);
-    expect(asFragment()).toMatchSnapshot();
+interface FeedbackWidgetProps {
+  pageId: string;
+  pageUrl: string;
+  helpfulDimensionId: number;
+  commentDimensionId: number;
+}
 
-    const searchInput = screen.getByRole("searchbox");
-    fireEvent.change(searchInput, { target: { value: "Vitest" } });
-    expect(searchInput).toHaveValue("Vitest");
+type FeedbackState = 'idle' | 'rated' | 'submitted';
 
-    // Prefer the button or a more specific form query
-    const submitButton = screen.getByRole("button", { name: /search/i });
-    fireEvent.click(submitButton);
+declare global {
+  interface Window {
+    _paq?: any[][];
+  }
+}
 
-    // Or, if you prefer to keep form submit:
-    // const form = screen.getByRole('search'); // after adding role="search"
-    // fireEvent.submit(form);
-  });
-});
+export default function FeedbackWidget({
+  pageId,
+  pageUrl,
+  helpfulDimensionId,
+  commentDimensionId,
+}: FeedbackWidgetProps) {
+  const storageKey = `feedback-${pageId}`;
+
+  const [state, setState] = useState<FeedbackState>('idle');
+  const [helpful, setHelpful] = useState<boolean | null>(null);
+  const [comment, setComment] = useState('');
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (sessionStorage.getItem(storageKey)) {
+      setState('submitted');
+    }
+  }, [storageKey]);
+
+  useEffect(() => {
+    if (state === 'rated' && textareaRef.current) {
+      textareaRef.current.focus();
+    }
+  }, [state]);
+
+  const markAsSubmitted = () => {
+    sessionStorage.setItem(storageKey, 'true');
+    setState('submitted');
+  };
+
+  const trackFeedback = (isHelpful: boolean, commentText = '') => {
+    window._paq = window._paq || [];
+
+    window._paq.push(['setCustomDimension', helpfulDimensionId, isHelpful ? 'Yes' : 'No']);
+
+    if (commentText.trim()) {
+      window._paq.push([
+        'setCustomDimension',
+        commentDimensionId,
+        commentText.trim().slice(0, 255),
+      ]);
+    }
+
+    window._paq.push([
+      'trackEvent',
+      'Page Feedback',
+      isHelpful ? 'Yes' : 'No',
+      pageUrl,
+    ]);
+  };
+
+  const submitRating = (isHelpful: boolean) => {
+    trackFeedback(isHelpful);
+    setHelpful(isHelpful);
+    setState('rated');
+  };
+
+  const submitComment = () => {
+    trackFeedback(helpful === true, comment);
+    markAsSubmitted();
+  };
+
+  const handleCancel = () => {
+    markAsSubmitted();
+  };
+
+  if (state === 'submitted') {
+    return (
+      <div className={styles.container} role="status" aria-live="polite">
+        <p className={styles.finalMessage}>
+          <CircleCheck className={styles.checkIcon} size={20} aria-hidden="true" />
+          Thanks for your feedback.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className={styles.container}>
+      <p className={styles.question}>Was this page helpful?</p>
+
+      <div className={styles.buttonGroup}>
+        <button
+          type="button"
+          className={`${styles.ratingButton} ${helpful === true ? styles.selected : ''}`}
+          onClick={() => submitRating(true)}
+          disabled={state === 'rated'}
+          aria-pressed={helpful === true}
+        >
+          Yes
+        </button>
+        <button
+          type="button"
+          className={`${styles.ratingButton} ${helpful === false ? styles.selected : ''}`}
+          onClick={() => submitRating(false)}
+          disabled={state === 'rated'}
+          aria-pressed={helpful === false}
+        >
+          No
+        </button>
+      </div>
+
+      {state === 'rated' && (
+        <div className={styles.commentSection}>
+          <p className={styles.thankYou} role="status" aria-live="polite">
+            Thank you. We have received your feedback.
+          </p>
+
+          <label htmlFor="feedback-comment" className={styles.label}>
+            What worked well or could be improved? (Optional)
+          </label>
+          <textarea
+            id="feedback-comment"
+            ref={textareaRef}
+            className={styles.textarea}
+            value={comment}
+            onChange={(e) => setComment(e.target.value)}
+            rows={4}
+          />
+
+          <div className={styles.actionButtons}>
+            <button type="button" className={styles.cancelButton} onClick={handleCancel}>
+              Cancel
+            </button>
+            <button type="button" className={styles.sendButton} onClick={submitComment}>
+              Send
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
